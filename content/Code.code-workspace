@@ -1,0 +1,24 @@
+{
+	"folders": [
+		{
+			"path": "../../.."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.embeddedhtml": "html",
+			"TEST_1.C": "cpp",
+			"string_view": "cpp",
+			"iostream": "cpp",
+			"array": "cpp",
+			"initializer_list": "cpp",
+			"utility": "cpp",
+			"iosfwd": "cpp",
+			"*.tcc": "cpp",
+			"string": "cpp",
+			"istream": "cpp"
+		},
+		"java.dependency.packagePresentation": "flat",
+		"liveServer.settings.port": 5501
+	}
+}
