@@ -109,7 +109,7 @@ struct _IO_jump_t
 
 一图以蔽之：
 
-![alt text](../assets/image/iofile.png)
+![alt text](用户态堆/images/IO/iofile.png)
 
 其中，`fp`是我们通过`fopen()`函数获取的文件指针，该结构体存储在堆中，大小为`0x1e0`；
 

@@ -17,7 +17,7 @@ description: 阵营：混沌中立
 利用效果：向目标地址写入一个极大值(该值实际上是main_arena的一个固定偏移)
 
 正常情况下的unsorted bin:
-![alt text](../../docs/images/unsorted_bin_attack1.png)
+![alt text](用户态堆/images/unsortedbinattack/unsorted_bin_attack1.png)
 
 当unlink时，会执行下面关键代码：
 ```c
@@ -27,7 +27,7 @@ description: 阵营：混沌中立
 ```
 
 尤其是最后一行`bck->fd = unsorted_chunks (av)`成为实施攻击的关键
-![alt text](../../docs/images/unsorted_bin_attack2.png)
+![alt text](用户态堆/images/unsortedbinattack/unsorted_bin_attack2.png)
 
 ## 高版本进行unsorted bin attack需要注意的事项
 当高版本有tcache之后，特别是在tcache未满时，从unsorted bin中malloc到的堆块并不会直接返回，而是先放入tcache bin中，再从tcache bin中取chunk，此时该攻击方法会出现问题。

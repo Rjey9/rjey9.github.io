@@ -7,6 +7,7 @@ description: faster faster faster!
 ---
 
 ## fastbin double free
+
 注意点：
 1. fast bin对double free有检查，即检查fast bin指向的chunk与victim是否相同。所以不能连续两次释放同一个chunk。可以通过中间多free另一个chunk来绕过
 2. fast bin会检查目标地址 + 8(即fake chunk的size位)是否符合fast bin大小
@@ -14,10 +15,13 @@ description: faster faster faster!
 该漏洞可配合tcache stash机制绕过tcache double free针对key指针的检查
 
 ## house of spirit
+
 漏洞成因：堆溢出写
-![alt text](../../docs/images/house_of_spirit1.png)
+
+![](用户态堆/images/fastbinattack/house_of_spirit1.png)
+
 利用条件：
-- 可以控制free的参数为fake chunk data addr
+- 可以控制free的参数为fake chunk data address
 - 可以如图进行fake chunk构造
 - chunk位置需对齐，杜绝了我们使用“自然生成”的0x7f等进行利用，因为这种数据往往位置不对齐
 
