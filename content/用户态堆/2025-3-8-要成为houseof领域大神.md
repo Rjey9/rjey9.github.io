@@ -24,7 +24,7 @@ description: 网安学妹会梦到土木学长吗？
      unlink(av, p, bck, fwd);
    }
 ```
-![alt text](../assets/image/houseofeinherjar1.png)
+![alt text](../../docs/images/houseofeinherjar1.png)
 
 我们需要绕过的unlink的check:
 ```c
@@ -129,7 +129,7 @@ if ((unsigned long) (size) >= (unsigned long) (nb + MINSIZE))
 ```
 由于与unsorted bin同为双向链表，其出链的方式与unsorted bin如出一辙，因此两者都可以进行house of lore攻击
 
-![alt text](../assets/image/houseoflore.png)
+![alt text](../../docs/images/houseoflore.png)
 
 此处解释一下：之所以fake chunk1能挂入链中，关键在于small bin取chunk是从链尾取的，即`victim = last(bin)`，而last()即从`bin -> bk` 索引。在将chunk2从链中取出时，会将`bin -> bk = bck`，由此挂入链中
 

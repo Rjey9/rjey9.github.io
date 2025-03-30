@@ -10,7 +10,7 @@ description: 你是large，我是什么？
 
 下图为0x400 - 0x440范围的large bin链表：
 
-![alt text](../assets/image/largebin.png)
+![alt text](../../docs/images/largebin.png)
 
 - 大小从大到小排序
 - 若大小相同，按照释放时间排序

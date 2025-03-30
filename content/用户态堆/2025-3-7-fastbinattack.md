@@ -15,7 +15,7 @@ description: faster faster faster!
 
 ## house of spirit
 漏洞成因：堆溢出写
-![alt text](../assets/image/house_of_spirit1.png)
+![alt text](../../docs/images/house_of_spirit1.png)
 利用条件：
 - 可以控制free的参数为fake chunk data addr
 - 可以如图进行fake chunk构造
