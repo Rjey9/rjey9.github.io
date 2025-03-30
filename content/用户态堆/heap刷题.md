@@ -84,12 +84,12 @@ edit(4, len(payload), payload)
 add(0x10)
 io.interactive()
 ```
-
-- 堆块重叠构造fake chunk时，对其进行free进入fastbin时会check next chunk的size位进行检查，所以需要注意构造
-- 申请fastbin中的chunk时也会对chunk size进行check，所以一定要符合对应fast bin大小
-- b *$rebase(offset) 可以在开启PIE偏移情况下打断点
-- 进行堆块重叠操作之前注意规避consolidate(添加gap)
-- calloc会清空chunk内容，其底层依旧是调用malloc
+> [!note] 总结
+> - 堆块重叠构造fake chunk时，对其进行free进入fastbin时会check next chunk的size位进行检查，所以需要注意构造
+> - 申请fastbin中的chunk时也会对chunk size进行check，所以一定要符合对应fast bin大小
+>  - `b $rebase(offset)` 可以在开启PIE偏移情况下打断点
+>  - 进行堆块重叠操作之前注意规避consolidate(添加gap)
+>  - calloc会清空chunk内容，其底层依旧是调用malloc
 
 ### roarctf 2019 easyheap (double free/house of spirit)
 
@@ -203,12 +203,13 @@ if __name__ == '__main__':
     attack()
 ```
 
-- 完成double free的适用情况： fast bin中有两个不同chunk，且其中一个存在UAF
-- 申请到malloc hook - 0x23是因为该处刚好有0x7f/0x7a作为首地址。经过观察与测设，该地址附近没有以0x6*、0x5*等其他首地址作为size利用的可能，所以当使用fast bin attack劫持malloc hook时，一定要注意size为0x70，才能成功申请
-- 在做这道题踩坑的同时发现，当没有edit功能却能够在malloc时修改chunk的情况下，通过对fast bin中fd修改为环，自身指向自身能够做到用malloc替代edit，做法就是一直malloc一直edit
-- 填充payload非必要情况下别用\x00，会造成很多麻烦
-- 在关闭输出，无法根据目标程序反馈进行攻击时，多注意sendline末尾的\n等字符，多注意目标程序所用输入函数逻辑，否则会很麻烦
-- free()会检查地址是否对齐（杜绝自然形成的0x7f），会检查next size，malloc()则没有那么多限制
+> [!note] 总结
+> -  完成double free的适用情况： fast bin中有两个不同chunk，且其中一个存在UAF
+> - 申请到malloc hook - 0x23是因为该处刚好有0x7f/0x7a作为首地址。经过观察与测设，该地址附近没有以0x6*、0x5*等其他首地址作为size利用的可能，所以当使用fast bin attack劫持malloc hook时，一定要注意size为0x70，才能成功申请
+> - 在做这道题踩坑的同时发现，当没有edit功能却能够在malloc时修改chunk的情况下，通过对fast bin中fd修改为环，自身指向自身能够做到用malloc替代edit，做法就是一直malloc一直edit
+> - 填充payload非必要情况下别用\x00，会造成很多麻烦
+> - 在关闭输出，无法根据目标程序反馈进行攻击时，多注意sendline末尾的\n等字符，多注意目标程序所用输入函数逻辑，否则会很麻烦
+> - free()会检查地址是否对齐（杜绝自然形成的0x7f），会检查next size，malloc()则没有那么多限制
 
 ### axb 2019 heap (off by one/unlink)
 
@@ -296,7 +297,8 @@ def attack():
 if __name__ == '__main__':
     attack()
 ```
-- fmtstr是真爽啊
+> [!note] 总结
+> fmtstr是真爽啊
 
 ### hitcon_2018_children_tcache (合并构造overlap/tcache double free)
 
@@ -376,8 +378,9 @@ if __name__ == '__main__':
 
 ```
 
-- 被放入tcache bin中的chunk不能够作为consolidate的目标，否则会报错。这道题里我一直将chunk 0设置为小于0x420的chunk，导致其在被合并时一直报错，浪费了许多时间
-- 同理，这里为什么是大chunk - 小chunk -大chunk的设计？就是因为小chunk无法被合并。尝试过小chunk - 大chunk进行合并，以失败告终
+> [!note] 总结
+> - 被放入tcache bin中的chunk不能够作为consolidate的目标，否则会报错。这道题里我一直将chunk 0设置为小于0x420的chunk，导致其在被合并时一直报错，浪费了许多时间
+> - 同理，这里为什么是大chunk - 小chunk -大chunk的设计？就是因为小chunk无法被合并。尝试过小chunk - 大chunk进行合并，以失败告终
 
 ## VNCTF 2021 pwn复现
 
@@ -459,8 +462,9 @@ if __name__ == '__main__':
             print("times:", i)
 ```
 
-- 利用io.shutdown_raw('send')发送EOF，但该管道相当于废弃
-- 要用try:except进行异常处理，否则run不起来，EOF会阻塞程序
+> [!note] 总结
+> - 利用io.shutdown_raw('send')发送EOF，但该管道相当于废弃
+> - 要用try:except进行异常处理，否则run不起来，EOF会阻塞程序
 
 ### ff (tcache异或加密 unsorted bin打stdout泄露libc)
 
@@ -561,13 +565,14 @@ if __name__ == '__main__':
             continue
 ```
 
-- 无法在不使用第二次edit机会的情况下通过tcache touble free进行攻击。因为tcache counts记录了tcache的数量。想要在touble free前绕过counts也不太行，因为idx只记录了最新的那个chunk，无法在tcache中垫好其他chunk
-- 打tcache attack要注意到counts，当counts归零则无法申请到对应bin的chunk，如果不注意就会像我这样浪费许多时间（怎么跟我想的不一样？？）
-- `find_fake_fast`指令可以在目标地址附近列出可以构造fake chunk的位置
-- 需要爆破的环节可以参考该exp
-- 劫持tcache perthread struct的环节需要一直考虑到counts与bin的影响，后续环节也可以通过提前布置好counts攻击，多结合切割unsorted bin chunk来调整指针位置，这部分也是最恶心的
-- 教训：坚信机器一定是正确的，如果没有出现预想的结果，那一定是exp有问题
-- 最后：牛魔，调昏了，调了一天，但是收获很多之前不知道或没注意的小trick
+> [!note] 总结
+>- 无法在不使用第二次edit机会的情况下通过tcache touble free进行攻击。因为tcache counts记录了tcache的数量。想要在touble free前绕过counts也不太行，因为idx只记录了最新的那个chunk，无法在tcache中垫好其他chunk
+> - 打tcache attack要注意到counts，当counts归零则无法申请到对应bin的chunk，如果不注意就会像我这样浪费许多时间（怎么跟我想的不一样？？）
+> - `find_fake_fast`指令可以在目标地址附近列出可以构造fake chunk的位置
+> - 需要爆破的环节可以参考该exp
+> - 劫持tcache perthread struct的环节需要一直考虑到counts与bin的影响，后续环节也可以通过提前布置好counts攻击，多结合切割unsorted bin chunk来调整指针位置，这部分也是最恶心的
+> - 教训：坚信机器一定是正确的，如果没有出现预想的结果，那一定是exp有问题
+> - 最后：牛魔，调昏了，调了一天，但是收获很多之前不知道或没注意的小trick
 
 
 ### VNCTF2021 LittleRedFlower
