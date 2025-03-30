@@ -2,7 +2,7 @@
 title: Hello, This is Rjay9
 ---
 
-### but, who is Rjay9? 🧐🧐🧐
+### But, who is Rjay9? 🧐🧐🧐
 
 - SCU 2023 Cybersecurity student
 - interested in binary

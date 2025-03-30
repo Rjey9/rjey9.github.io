@@ -8,7 +8,7 @@ description: 截止到2025/3/26 均为用户态
 
 ### pwn161
 
-glibc 2.23
+> [!版本] glibc 2.23
 
 通过代码审计发现edit函数中当输入size - chunk_size = 10时，可以触发offbyone漏洞多读入1字节。
 
@@ -93,7 +93,7 @@ io.interactive()
 
 ### roarctf 2019 easyheap (double free/house of spirit)
 
-glibc 2.23
+> [!版本] glibc 2.23
 
 没有edit功能造成了很大的不便
 
@@ -213,6 +213,8 @@ if __name__ == '__main__':
 
 ### axb 2019 heap (off by one/unlink)
 
+> [!版本] glibc 2.23
+
 头一次用上了结构体/数组逆向trick
 
 伪代码指针太复杂看不懂可以直接上手动调
@@ -301,6 +303,8 @@ if __name__ == '__main__':
 > fmtstr是真爽啊
 
 ### hitcon_2018_children_tcache (合并构造overlap/tcache double free)
+
+> [!版本] glibc 2.27
 
 无edit 无UAF 存在off by null
 
@@ -468,7 +472,9 @@ if __name__ == '__main__':
 
 ### ff (tcache异或加密 unsorted bin打stdout泄露libc)
 
-libc2.32保护全开
+> [!版本] glibc 2.32
+
+保护全开
 
 ```python
 from pwn import *
@@ -575,16 +581,109 @@ if __name__ == '__main__':
 > - 最后：牛魔，调昏了，调了一天，但是收获很多之前不知道或没注意的小trick
 
 
-### VNCTF2021 LittleRedFlower
+### LittleRedFlower (Attack MP.tcache_bins即TCACHE_MAX_BINS)
+
+> [!版本] glibc 2.30
 
 依旧是保护全开
 
 1. 有沙盒，无法执行execve
 2. hint:试试看打TCACHE_MAX_BINS
-3. gift: stdout的地址
+3. gift: stdout的地址 相当于给了Libc基址
 4. 有一字节任意写的机会
 5. 在预先分配好的0x200大小的堆指针任意偏移处有写8 bytes的机会
-6. 可以申请一个 大于0xfff 小于0x2000的chunk
+6. 可以申请一个 大于0xfff 小于0x2000的chunk，该chunk最后会被free
+
+##### 为什么打TCACHE_MAX_BINS
+
+上一道题打的是tcache的counts以及idx，而这道题打的是tcache_max_bins，简单来说就是通过篡改tcache_max_bins使得tcache中的chunk大小突破0x420，对应这道题中就是让我们最后申请的大于0xfff的chunk也被识别为tcache chunk，从而我们能够通过该次malloc作进一步利用
+
+根本原理是
+
+```c
+void* __libc_malloc(size_t bytes) {
+    size_t tbytes;
+    
+    if (!checked_request2size(bytes, &tbytes)) {
+        return NULL;
+    }
+    size_t tc_idx = csize2tidx(tbytes);
+
+    MAYBE_INIT_TCACHE();
+  
+    if (tc_idx < mp_.tcache_bins && tcache && tcache->counts[tc_idx] > 0) {
+        return tcache_get(tc_idx);
+    }
+    // 如果 tcache 没有可用块，调用其他分配逻辑
+    ...
+}
+```
+
+从这段源码可以看到，malloc函数会判断size是否小于mp_.tcache_bins，判断是否适合从tcache分配，我们先改mp_.tcache_bins，就能进入tcache的分配逻辑，
+
+```c
+static __always_inline void* tcache_get(size_t idx) {
+    tcache_entry* e = tcache->entries[idx]; // 获取链表头
+    if (e != NULL) {
+        tcache->entries[idx] = REVEAL_PTR(e->next); // 更新链表头
+        tcache->counts[idx]--; // 减少计数
+        return (void*) e; // 返回块
+    }
+    return NULL;
+}
+```
+
+其中关键在于idx是通过size进行计算的，即以下宏：
+
+```c
+#define csize2tidx(x) \
+    (((x) - MINSIZE + MALLOC_ALIGNMENT - 1) / MALLOC_ALIGNMENT)
+```
+
+通过该宏能够通过size计算对应的index。只要我们能够绕过MAX_TCACHE_SIZE，再根据size作对应计算idx的位置处布置好victim address，就能申请到目标地址
+
+##### 怎么打MAX_TCACHE_SIZE
+
+MAX_TCACHE_SIZE作为宏无法被修改，但是mp_.tcache_bins作为存储MAX_TCACHE_SIZE可以被修改，并且后续判断也是依照mp_.tcache_bins进行判断。mp结构体即`malloc_par mp_`存在于libc中，我们可以通过开头泄露的libc地址找到并一字节修改它
+
+```c
+static struct malloc_par mp_ = {
+  .top_pad = DEFAULT_TOP_PAD,
+  .n_mmaps_max = DEFAULT_MMAP_MAX,
+  .mmap_threshold = DEFAULT_MMAP_THRESHOLD,
+  .trim_threshold = DEFAULT_TRIM_THRESHOLD,
+#define NARENAS_FROM_NCORES(n) ((n) * (sizeof (long) == 4 ? 2 : 8))
+  .arena_test = NARENAS_FROM_NCORES (1),
+#if USE_TCACHE
+  .tcache_count = TCACHE_FILL_COUNT,
+  .tcache_bins = TCACHE_MAX_BINS,
+  .tcache_max_bytes = tidx2usize (TCACHE_MAX_BINS-1),
+  .tcache_unsorted_limit = 0 /* No limit.  */
+#endif
+};
+```
+
+由于mp_结构体被static关键字修饰，会显示为局部符号而非全局符号，因此不会出现在符号表中
+
+libc没调试信息找不到一点，只能从ida里硬翻：
+
+![](用户态堆/images/heap刷题/mp_.png)
+
+`0x1EA2D0`就是mp_.tcache_bins的位置。下次再打mp_直接对照这张图
+
+由于我们已经没有机会再修改`counts`，于是看看堆上有无自然生成的的counts，刚好heap_base + 0x298有0x211的数据，或者我们不用它，因为出题人给我们在0x210大小的chunk中布置好了0x0101010101的数据，拿来用就是
+
+直接尝试malloc 0x2000大小的chunk，观察malloc崩溃时的rax就可以计算对应的idx地址，此时的rcx为对应的counts地址
+
+如何计算出对应的idx地址？malloc崩溃时正在对`[rax + 0x80]`这个位置操作，但这个位置的值为0，不难分析出，此时就是在取idx处的ptr，那么`rax + 80`就应该是对应的idx地址
+
+在该位置填上free_hook地址，即可申请到free_hook的堆块，并往里面写入orw shellcode
+
+但是仍然有一个问题，free_hook所在的位置并没有执行权限，如果我们想要使用mprotect给该位置上权限，又离不开用栈传参。
+
+##### hook如何进行orw
+
+欸，我这里有个神奇妙妙工具：
 
 ```python
 
