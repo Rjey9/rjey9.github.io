@@ -3,12 +3,12 @@ title: 随便做做题
 date: 2025-3-13 00:00:00 +0800
 categories: [Blog, pwn]
 tags: [pwn]
-description: 截止到2025/3/26 均为用户态
+description: 截止到2025/3/26 均为用户态堆题
 ---
 
 ### pwn161
 
-> [!版本] glibc 2.23
+> [!libc] glibc 2.23
 
 通过代码审计发现edit函数中当输入size - chunk_size = 10时，可以触发offbyone漏洞多读入1字节。
 
@@ -93,7 +93,7 @@ io.interactive()
 
 ### roarctf 2019 easyheap (double free/house of spirit)
 
-> [!版本] glibc 2.23
+> [!libc] glibc 2.23
 
 没有edit功能造成了很大的不便
 
@@ -583,7 +583,7 @@ if __name__ == '__main__':
 
 ### LittleRedFlower (Attack mp_.tcache_bins)
 
-> [!版本] glibc 2.30
+> [!libc] glibc 2.30
 
 依旧是保护全开
 
@@ -642,7 +642,7 @@ static __always_inline void* tcache_get(size_t idx) {
 
 通过该宏能够通过size计算对应的index。只要我们能够绕过MAX_TCACHE_SIZE，再根据size作对应计算idx的位置处布置好victim address，就能申请到目标地址
 
-##### 怎么打MAX_TCACHE_SIZE
+##### 怎么打TCACHE_MAX_BINS
 
 MAX_TCACHE_SIZE作为宏无法被修改，但是mp_.tcache_bins作为存储MAX_TCACHE_SIZE可以被修改，并且后续判断也是依照mp_.tcache_bins进行判断。mp结构体即`malloc_par mp_`存在于libc中，我们可以通过开头泄露的libc地址找到并一字节修改它
 
