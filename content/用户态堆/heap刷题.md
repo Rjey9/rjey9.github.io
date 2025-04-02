@@ -1,9 +1,12 @@
 ---
 title: 随便做做题
 date: 2025-3-13 00:00:00 +0800
-categories: [Blog, pwn]
-tags: [pwn]
-description: 截止到2025/3/26 均为用户态堆题
+categories:
+  - Blog
+  - pwn
+tags:
+  - pwn
+description: 截止到2025/3/26 均为用户态题
 ---
 
 ### pwn161
@@ -793,3 +796,7 @@ def attack():
 if __name__ == '__main__':  
     attack()
 ```
+
+## RCTF2020 复现
+
+### no_write
