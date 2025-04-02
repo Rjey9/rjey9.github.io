@@ -1,6 +1,6 @@
 ---
 title: LoOS lab1 编写系统调用
-draft: true
+draft: false
 ---
 
 ### 当我们在LoOS里进行系统调用，实际上发生了什么？

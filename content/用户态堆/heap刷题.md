@@ -216,7 +216,7 @@ if __name__ == '__main__':
 
 ### axb 2019 heap (off by one/unlink)
 
-> [!版本] glibc 2.23
+> [!libc] glibc 2.23
 
 头一次用上了结构体/数组逆向trick
 
@@ -307,7 +307,7 @@ if __name__ == '__main__':
 
 ### hitcon_2018_children_tcache (合并构造overlap/tcache double free)
 
-> [!版本] glibc 2.27
+> [!libc] glibc 2.27
 
 无edit 无UAF 存在off by null
 
@@ -475,7 +475,7 @@ if __name__ == '__main__':
 
 ### ff (tcache异或加密 unsorted bin打stdout泄露libc)
 
-> [!版本] glibc 2.32
+> [!libc] glibc 2.32
 
 保护全开
 
