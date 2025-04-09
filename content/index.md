@@ -11,6 +11,7 @@ title: Hello, This is Rjay9
   - Apex 1000+ hours (Pathfinder & Horizon player)
   - Rainbow six siege 500+ hours (Nokk & Smoke player)
 - You can call me R9😘
+- 之前被FPS耽误了太多时间，现在下定决心开始认真学PWN
 ### 我的博客做什么？
 
 记录学习旅途上的一些心得体会

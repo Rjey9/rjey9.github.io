@@ -7,6 +7,7 @@ categories:
 tags:
   - pwn
 description: 截止到2025/3/26 均为用户态题
+aliases:
 ---
 
 ### pwn161
@@ -388,6 +389,17 @@ if __name__ == '__main__':
 > [!note] 总结
 > - 被放入tcache bin中的chunk不能够作为consolidate的目标，否则会报错。这道题里我一直将chunk 0设置为小于0x420的chunk，导致其在被合并时一直报错，浪费了许多时间
 > - 同理，这里为什么是大chunk - 小chunk -大chunk的设计？就是因为小chunk无法被合并。尝试过小chunk - 大chunk进行合并，以失败告终
+
+### BUUOJ house of orange
+
+> [!libc] 2.23
+
+ 保护全开，卖欧润吉，有add有show有edit，但是没有free
+
+edit只能进行3次，并且存在大范围越界写
+
+可以通过大范围越界写修改top chunk的size，
+
 
 ## VNCTF 2021 pwn复现
 
@@ -797,6 +809,9 @@ if __name__ == '__main__':
     attack()
 ```
 
-## RCTF2020 复现
+## House of apple刷题
 
-### no_write
+
+跳转此处学习`house of apple`系列手法：[house of apple]([House of Apple 一种新的glibc中IO攻击方法 (1) - roderick - record and learn!](https://www.roderickchan.cn/zh-cn/house-of-apple-%E4%B8%80%E7%A7%8D%E6%96%B0%E7%9A%84glibc%E4%B8%ADio%E6%94%BB%E5%87%BB%E6%96%B9%E6%B3%95-1/))
+
+### 

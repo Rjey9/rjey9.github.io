@@ -167,3 +167,124 @@ struct sigcontext
 1. 可以控制程序执行流
 2. 存在相应的gadget
 3. 可以控制相当大的空间（存储fake frame）
+
+### 从wsl调用ida脚本
+
+32位：
+
+```shell
+#!/bin/bash
+
+# 检查是否提供了文件名作为参数
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <filename>"
+    exit 1
+fi
+
+# 获取文件名
+FILENAME=$1
+REAL_PATH=$(realpath "$FILENAME")
+# 检查文件是否存在
+if [ ! -f "$FILENAME" ]; then
+    echo "File not found: $FILENAME"
+    exit 1
+fi
+
+# 将Linux文件路径转换为Windows文件路径
+# 假设WSL的挂载点是/mnt/c，根据你的实际情况进行调整
+WINDOWS_PATH="\\wsl.localhost"
+
+# 检查ida32是否在PATH中，如果不在，需要指定完整路径
+# 这里使用which命令查找ida32，如果没有安装which，可以注释掉下面两行，并直接使用ida32的 完整路径
+IDA_PATH="C:\Users\33206\Desktop\PwnTools\IDA\ida.exe"
+if [ -z "$IDA_PATH" ]; then
+    echo "ida32 not found in PATH. Please specify the full path to ida32."
+    exit 1
+fi
+
+# 启动ida32并传递文件路径
+powershell.exe -Command "Start-Process -FilePath '$IDA_PATH' -ArgumentList '$REAL_PATH'"
+```
+
+64位：
+
+```shell
+#!/bin/bash
+
+# 检查是否提供了文件名作为参数
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <filename>"
+    exit 1
+fi
+
+# 获取文件名
+FILENAME=$1
+REAL_PATH=$(realpath "$FILENAME")
+# 检查文件是否存在
+if [ ! -f "$FILENAME" ]; then
+    echo "File not found: $FILENAME"
+    exit 1
+fi
+
+# 将Linux文件路径转换为Windows文件路径
+# 假设WSL的挂载点是/mnt/c，根据你的实际情况进行调整
+WINDOWS_PATH="\\wsl.localhost"
+
+# 检查ida64是否在PATH中，如果不在，需要指定完整路径
+# 这里使用which命令查找ida64，如果没有安装which，可以注释掉下面两行，并直接使用ida64的 完整路径
+IDA_PATH="C:\Users\33206\Desktop\PwnTools\IDA\ida64.exe"
+if [ -z "$IDA_PATH" ]; then
+    echo "ida64 not found in PATH. Please specify the full path to ida64."
+    exit 1
+fi
+
+# 启动ida64并传递文件路径
+powershell.exe -Command "Start-Process -FilePath '$IDA_PATH' -ArgumentList '$REAL_PATH'"
+```
+
+### tmux配置：
+
+```shell
+
+set -g base-index         1     # 窗口编号从 1 开始计数
+set -g display-panes-time 10000 # PREFIX-Q 显示编号的驻留时长，单位 ms
+set -g mouse              on    # 开启鼠标
+set -g pane-base-index    1     # 窗格编号从 1 开始计数
+set -g renumber-windows   on    # 关掉某个窗口后，编号重排
+set -g default-shell /bin/fish
+
+bind -n M-h select-pane -L
+bind -n M-l select-pane -R
+bind -n M-j select-pane -U
+bind -n M-k select-pane -D
+
+bind -n M-1 select-window -t 1
+bind -n M-2 select-window -t 2
+bind -n M-3 select-window -t 3
+bind -n M-4 select-window -t 4
+bind -n M-5 select-window -t 5
+bind -n M-6 select-window -t 6
+bind -n M-7 select-window -t 7
+bind -n M-8 select-window -t 8
+bind -n M-9 select-window -t 9
+
+bind -n M-n next-layout
+
+bind h splitw -h -c '#{pane_current_path}'  # 水平分屏（左右分割）
+bind j splitw -v -c '#{pane_current_path}'  # 垂直分屏（上下分割，向下）
+bind k splitw -v -c '#{pane_current_path}'  # 垂直分屏（上下分割，向上）
+bind l splitw -h -c '#{pane_current_path}'  # 水平分屏（左右分割）
+
+#set -g @plugin 'erikw/tmux-powerline'
+# default statusbar colors
+#set -g status-bg black
+#setw -g window-status-bell-style bg=black
+
+
+set-option -g status-left "#(~/.config/tmux/tmux-powerline/powerline.sh left)"
+set-option -g status-right "#(~/.config/tmux/tmux-powerline/powerline.sh right)"
+
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-sensible'
+run '~/.tmux/plugins/tpm/tpm'
+```

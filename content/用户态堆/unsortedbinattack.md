@@ -1,9 +1,13 @@
 ---
 title: unsorted bin attack
 date: 2025-3-7 14:00:00 +0800
-categories: [Blog, pwn]
-tags: [pwn]
+categories:
+  - Blog
+  - pwn
+tags:
+  - pwn
 description: 阵营：混沌中立
+draft: true
 ---
 
 ## unsorted bin leak
@@ -14,7 +18,7 @@ description: 阵营：混沌中立
 
 利用条件：可修改unsorted bin中的chunk的bk指针
 
-利用效果：向目标地址写入一个极大值(该值实际上是main_arena的一个固定偏移)
+利用效果：向目标地址写入一个极大值(该值实际上是main_arena+0x88)
 
 正常情况下的unsorted bin:
 ![alt text](用户态堆/images/unsortedbinattack/unsorted_bin_attack1.png)

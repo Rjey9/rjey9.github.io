@@ -1,6 +1,6 @@
 ---
 title: LoOS lab1 编写系统调用
-draft: false
+draft: true
 ---
 
 ### 当我们在LoOS里进行系统调用，实际上发生了什么？
@@ -341,11 +341,71 @@ main:
 
 使用loOS提供的编译工具进行编译，然后挂载运行即可
 
-### 剩下的工作
+### 剩下的工作：RTC
 
-##### 机器的心脏：RTC
+##### 如何访问RTC
 
-##### 
+前面的工作只是适应一下`syscall`的实现，接下来要做的是实现`sys_clock_gettime`与`sys_gettimeofday`，而这两个均需要从`rtc.h`的`rtc_time`结构体中取信息
+
+`rtc.c`与`rtc.h`中仅定义了结构体，声明了函数，并未对函数进行实现，这就是我们的工作
+
+根据龙芯处理器用户手册可知，与`rtc`相关的各个寄存器均基于`RTC_REGISTER_BASE`进行寻址，而`RTC_REGISTER_BASE`又基于`BAR_BASE`加上偏移进行寻址。这部分在`rtc.h`中已经实现：
+
+```c
+#define BAR_BASE               0x1FE2ULL  /* 0b1111111100010 */
+#define RTC_REGISTER_BASE      ((BAR_BASE << 16) | (0x7 << 12) | (0x1 << 11))
+```
+
+基于`RTC_REGISTER_BASE`，我们可以利用偏移访问RTC模块寄存器，对其在`rtc.c`中进行宏定义如下：
+
+```c
+#define sys_toytrim (RTC_REGISTER_BASE + 0x20)
+#define sys_toywrite0 (RTC_REGISTER_BASE + 0x24)
+#define sys_toywrite1 (RTC_REGISTER_BASE + 0x28)
+#define sys_toyread0 (RTC_REGISTER_BASE + 0x2C)
+#define sys_toyread1 (RTC_REGISTER_BASE + 0x30)
+#define sys_toymatch0 (RTC_REGISTER_BASE + 0x34)
+#define sys_toymatch1 (RTC_REGISTER_BASE + 0x38)
+#define sys_toymatch2 (RTC_REGISTER_BASE + 0x3C)
+#define sys_rtcctrl (RTC_REGISTER_BASE + 0x40)
+#define sys_rtctrim (RTC_REGISTER_BASE + 0x60)
+#define sys_rtcwrite0 (RTC_REGISTER_BASE + 0x64)
+#define sys_rtcread0 (RTC_REGISTER_BASE + 0x68)
+#define sys_rtcmatch0 (RTC_REGISTER_BASE + 0x6C)
+#define sys_rtcmatch1 (RTC_REGISTER_BASE + 0x70)
+#define sys_rtcmatch2 (RTC_REGISTER_BASE + 0x74)
+```
+##### 对各个RTC函数的实现
+
+如果想要实现更上层的syscall，我们就首先需要实现与rtc相关的基本行为函数：`rtc_init`、`rtc_read_time`、`rtc_set_time`、`rtc_tm_to_sec`以及`rtc_sec_to_tm`
+
+根据龙芯手册，在使用RTC前必须要对`sys_rtcctrl`进行初始化：
+
+根据下图，我们可以在`rtc_init`中进行对应置位
+
+![](OS/OSlab/images/sys_rtcctrl.png)
+
+```c
+/* 初始化RTC */
+void rtc_init(void) {
+    // set sys_rtcctrl reg
+    uint32_t rtcctrl = *(volatile uint32_t *)sys_rtcctrl;
+    rtcctrl |= (1 << 13); //第十三位 REN使能
+    rtcctrl |= (1 << 11); //第十一位 TEN使能
+    rtcctrl |= (1 << 8); //启用晶振
+    *(volatile uint32_t *)sys_rtcctrl = rtcctrl;
+
+    //set rtc_time structure
+    struct rtc_time tm;
+    memset(&tm, 0, sizeof(struct rtc_time));
+    return;
+}
+```
+
+接下来依照下图实现`rtc_read_time`与`rtc_set_time`函数：
+
+
+
 
 
 ``

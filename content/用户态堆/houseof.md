@@ -1,9 +1,13 @@
 ---
 title: 要成为House of 领域大神！
 date: 2025-3-8 00:00:00 +0800
-categories: [Blog, pwn]
-tags: [pwn]
+categories:
+  - Blog
+  - pwn
+tags:
+  - pwn
 description: 网安学妹会梦到土木学长吗？
+draft: true
 ---
 
 只记录在其他部分未曾记录的house of 手法
@@ -150,7 +154,8 @@ if ((unsigned long) (size) >= (unsigned long) (nb + MINSIZE))
 
 看起来简单，但实际上需要满足一些条件：
 - sysmalloc有mmap与brk两种分配方式，我们需要让堆以brk的方式拓展，这样才能使chunk进入unsorted bin中。要符合该条件，malloc的尺寸不能大于mmp.mmap_threshold = 128k(否则会直接使用mmap)
-- 其次要满足sysmalloc中对top size的合法性检查：size 要大于 MINSIZE(0x10)、size 要小于之后申请的 chunk size + MINSIZE(0x10)、size 的 prev inuse 位必须为 1
+- 其次要满足sysmalloc中对top size的合法性检查：size 要大于 MINSIZE(0x10)、要小于之后申请的 chunk size + MINSIZE(0x10)、size 的 prev inuse 位必须为 1
+- 原本old top chunk的地址加上其size之后的地址要与页对齐 也就是address&0xfff=0x000
 
 程序或许不会允许分配过大的内存，此时我们可以通过堆溢出写，将top chunk的size按照上述条件进行调整，然后再进行malloc
 

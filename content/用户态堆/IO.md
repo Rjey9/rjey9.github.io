@@ -1,9 +1,13 @@
 ---
 title: PWN io_file exploitation
 date: 2025-3-10 00:00:00 +0800
-categories: [Blog, pwn]
-tags: [pwn]
+categories:
+  - Blog
+  - pwn
+tags:
+  - pwn
 description: 滑上又滑落，一收和一放
+draft: true
 ---
 
 ## IO相关结构体

@@ -1,9 +1,13 @@
 ---
 title: fast bin attack
 date: 2025-3-7 15:00:00 +0800
-categories: [Blog, pwn]
-tags: [pwn]
+categories:
+  - Blog
+  - pwn
+tags:
+  - pwn
 description: faster faster faster!
+draft: true
 ---
 
 ## fastbin double free
