@@ -1,9 +1,12 @@
 ---
 title: 手搓shellcode 个人笔记
 date: 2024-11-11 21:00:00 +0800
-categories: [Blog, pwn]
-tags: [pwn]
-draft: false
+categories:
+  - Blog
+  - pwn
+tags:
+  - pwn
+draft: true
 ---
 # 手搓shellcode 个人笔记
 随着题目的难度加大，简单的通用shellcode愈发难以满足需求，面对各种各样的限制，我们需要学会手写shellcode以面对包括但不限于

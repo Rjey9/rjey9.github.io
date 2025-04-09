@@ -1,8 +1,12 @@
 ---
 title: newstarctf2024 pwn个人复现
 date: 2024-11-10 21:00:00 +0800
-categories: [Blog, pwn]
-tags: [pwn]
+categories:
+  - Blog
+  - pwn
+tags:
+  - pwn
+draft: true
 ---
 # newstarctf 2024 pwn个人复现
 从8月15日开始学习pwn有一段时间，最近似乎又陷入了瓶颈期，经过一段时间的反思，到底还是懒于思考，懒于实践。故鞭策自己，望勤动手，勤复现。  

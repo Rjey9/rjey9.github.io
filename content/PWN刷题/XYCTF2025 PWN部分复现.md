@@ -118,7 +118,18 @@ if __name__ == '__main__':
 
 有`fmt`，一次就能泄露libc、canary以及pie，剩下绕过沙盒理应很简单，但是我做题的时候根本没有Libc文件，找也找不到，于是作罢
 
-中间很多次怀疑是不是根本用不到libc，而是用其他的方式打沙盒
+中间很多次怀疑是不是根本用不到libc，而是用其他的方式打沙盒 甚至开始去找CVE，所以到最后这道送分题都没做出来
+
+赛后从 heshi 师傅那里学到一招：使用`strings`查看elf文件编译环境，从编译环境推测libc版本。
+
+```shell
+~/p/X/girlfriend ❯❯❯ strings ./pwn | grep GCC
+GCC: (Ubuntu 10.5.0-1ubuntu1~22.04) 10.5.0
+```
+
+从Ubuntu 22.04可以确定大致的libc版本，由于题是这段时间出的，所以直接找22.04最新的修订版libc就行
+
+
 
 ### 明日方舟寻访模拟器
 
@@ -346,7 +357,7 @@ if __name__ == "__main__":
 
 ##### 打法2 随机数预测
 
-[参考此处]([2025XYCTF|NPUSEC](https://www.npusec.org.cn/archives/2025xyctf#%E5%A5%B6%E9%BE%99%E5%9B%9E%E5%AE%B6))
+[2025XYCTF|NPUSEC](https://www.npusec.org.cn/archives/2025xyctf#%E5%A5%B6%E9%BE%99%E5%9B%9E%E5%AE%B6)
 
 假设我们没有想到用整数溢出修改局部变量，那么就只能打这种办法：
 
@@ -470,5 +481,5 @@ if __name__ == "__main__":
 
 可以直接在IDA里对程序进行patch
 
-##### 打法3 
 ### heap2
+
