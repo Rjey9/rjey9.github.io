@@ -52,7 +52,7 @@ $4 = {
     _wide_data = 0x7ffff7e1a9a0 <_IO_wide_data_1>,
     _freeres_list = 0x0,
     _freeres_buf = 0x0,
-    __pad5 = 0,
+    __pa0d5 = 0,
     _mode = 0,
     _unused2 = '\000' <repeats 19 times>
   },

