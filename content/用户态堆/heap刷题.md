@@ -419,10 +419,15 @@ if (in_smallbin_range(size)) // 假如是small chunk。
     // 这里还没放回去，但是获取到了要放入的small bin的头指针和第一个chunk
 }
 ```
-3. 
+3. glibc继续遍历unsorted bin 由unsorted bin的bk索引到_IO_list_all处，发现这个chunk大小不符合规范，于是进入利用链`malloc_printerr() -> __libc_message() -> abort() -> fflush() -> _IO_flush_all_lockp() -> _IO_new_file_overflow()`，触发FSOP
 ```c
+  3479           if (__builtin_expect (victim->size <= 2 * SIZE_SZ, 0)
+   3480               || __builtin_expect (victim->size > av->system_mem, 0))
+ ► 3481             malloc_printerr (check_action, "malloc(): memory corruption",
+   3482                              chunk2mem (victim), av);
 ```
 
+exp:
 
 ```python
 from pwn import *

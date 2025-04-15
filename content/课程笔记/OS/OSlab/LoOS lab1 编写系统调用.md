@@ -383,7 +383,7 @@ main:
 
 根据下图，我们可以在`rtc_init`中进行对应置位
 
-![](OS/OSlab/images/sys_rtcctrl.png)
+![](sys_rtcctrl.png)
 
 ```c
 /* 初始化RTC */
