@@ -3,6 +3,8 @@ title: LoOS lab1 编写系统调用
 draft: true
 ---
 
+# Task 1
+
 ### 当我们在LoOS里进行系统调用，实际上发生了什么？
 
 ###### 1. 用户态程序发起系统调用
@@ -341,6 +343,8 @@ main:
 
 使用loOS提供的编译工具进行编译，然后挂载运行即可
 
+# Task 2
+
 ### 剩下的工作：RTC
 
 ##### 如何访问RTC
@@ -349,11 +353,23 @@ main:
 
 `rtc.c`与`rtc.h`中仅定义了结构体，声明了函数，并未对函数进行实现，这就是我们的工作
 
-根据龙芯处理器用户手册可知，与`rtc`相关的各个寄存器均基于`RTC_REGISTER_BASE`进行寻址，而`RTC_REGISTER_BASE`又基于`BAR_BASE`加上偏移进行寻址。这部分在`rtc.h`中已经实现：
+根据龙芯处理器用户手册可知，与`rtc`相关的各个寄存器均基于`RTC_REGISTER_BASE`进行寻址，而`RTC_REGISTER_BASE`又基于`BAR_BASE`加上偏移进行寻址。
+
+![](课程笔记/OS/OSlab/images/Lab1/RTCreg.png)
+
+这部分在`rtc.h`中已经实现：
 
 ```c
 #define BAR_BASE               0x1FE2ULL  /* 0b1111111100010 */
 #define RTC_REGISTER_BASE      ((BAR_BASE << 16) | (0x7 << 12) | (0x1 << 11))
+```
+
+但是在原lab的基础上，OS访问的并不是直接的物理地址0x1FE2700(+offset)，而是在基地址`0x9000000000000000`上访问虚拟地址
+
+所以将`RTC_REGISTER_BASE`修改如下：
+
+```c
+#define RTC_REGISTER_BASE      (((BAR_BASE << 16) | (0x7 << 12) | (0x1 << 11))+0x9000000000000000)
 ```
 
 基于`RTC_REGISTER_BASE`，我们可以利用偏移访问RTC模块寄存器，对其在`rtc.c`中进行宏定义如下：
@@ -375,19 +391,38 @@ main:
 #define sys_rtcmatch1 (RTC_REGISTER_BASE + 0x70)
 #define sys_rtcmatch2 (RTC_REGISTER_BASE + 0x74)
 ```
-##### 对各个RTC函数的实现
 
 如果想要实现更上层的syscall，我们就首先需要实现与rtc相关的基本行为函数：`rtc_init`、`rtc_read_time`、`rtc_set_time`、`rtc_tm_to_sec`以及`rtc_sec_to_tm`
+
+这些函数都涉及到对rtc相关寄存器的访问
 
 根据龙芯手册，在使用RTC前必须要对`sys_rtcctrl`进行初始化：
 
 根据下图，我们可以在`rtc_init`中进行对应置位
 
-![](sys_rtcctrl.png)
+![](课程笔记/OS/OSlab/images/Lab1/sys_rtcctrl.png)
+
 
 ```c
 /* 初始化RTC */
 void rtc_init(void) {
+
+	//输出调试信息
+    printf("initializing RTC...\n");
+    printf("sys_toytrim: %x\n", sys_toytrim);
+    printf("sys_rtctrim: %x\n", sys_rtctrim);
+    printf("sys_rtcctrl: %x\n", sys_rtcctrl);
+    
+     //set sys_toytrim reg
+    uint32_t toytrim = *(volatile uint32_t *)sys_toytrim;
+    toytrim = 0;
+    *(volatile uint32_t *)sys_toytrim = toytrim;
+
+    //set sys_rtctrim reg
+    uint32_t rtctrim = *(volatile uint32_t *)sys_rtctrim;
+    rtctrim = 0;
+    *(volatile uint32_t *)sys_rtctrim = rtctrim;
+
     // set sys_rtcctrl reg
     uint32_t rtcctrl = *(volatile uint32_t *)sys_rtcctrl;
     rtcctrl |= (1 << 13); //第十三位 REN使能
@@ -395,19 +430,165 @@ void rtc_init(void) {
     rtcctrl |= (1 << 8); //启用晶振
     *(volatile uint32_t *)sys_rtcctrl = rtcctrl;
 
-    //set rtc_time structure
-    struct rtc_time tm;
-    memset(&tm, 0, sizeof(struct rtc_time));
     return;
 }
 ```
 
-接下来依照下图实现`rtc_read_time`与`rtc_set_time`函数：
+接下来再在`kmain`函数中加入对`rtc_init`函数的调用，如此loOS才能在系统启动时对其进行初始化
 
+```c
+int kmain() {
+    printf("kernel: start\n");
+    w_csr_euen(1);
+    // dump_dmw();
+    dmw_init();
+    // kinit();
+    trap_init();
+    tlb_init();
+    vm_init();
+    pmm_init();
+    fs_init();
+    proc_init();
+    disk_init();
+    user_init();
+    rtc_init();
+    intr_on();  
+    printf("kernel: finish\n");
+    scheduler();
+    while (1);
+    panic("should not reach here");
+}
+```
 
+##### 如何完成考核
 
+通过阅读`grade-lab1-rtc.py`可知，其测试原理是qemu启动loOS后运行`busybox date`命令，并从其中得到时间与现实时间进行比对。
 
+通过查阅可知，Linux上的`date`命令其底层是调用了`sys_clock_gettime`，该接口对`timespec`结构体进行了设置，而后`date`从`timespec`中读取了秒数，转换为时间后显示。
 
-``
+有如下调用链：
 
+![](课程笔记/OS/OSlab/images/Lab1/rtc_calls.png)
 
+其中`date`已经由busybox实现，我们需要继续实现`sys_clock_gettime`与`rtc_read_time`与`rtc_tm_to_sec`
+
+由于从rtc寄存器中读取时间，其主要方式是从各个二进制位上读取，因此写一个宏`EXTRACT_BITS`来完成按位访问：
+
+```c
+#define EXTRACT_BITS(var, start, end) \
+((uint32_t)(((var) & (((1ULL << ((end) - (start) + 1)) - 1) << (start))) >> (start)))
+```
+
+对于`rtc_read_time`，有下图可以参考：
+
+![](课程笔记/OS/OSlab/images/Lab1/sys_toyread0.png)
+
+![](课程笔记/OS/OSlab/images/Lab1/sys_toyread1.png)
+
+对应可以实现`rtc_read_time`函数如下：
+
+```c
+int rtc_read_time(struct rtc_time *tm) {
+    if (tm == NULL) {
+        return -1;
+    }
+    // printf("sys_toyread0 addr = 0x%08x\n", sys_toyread0);
+    // printf("sys_toyread1 addr = 0x%08x\n", sys_toyread1);
+    uint32_t TOYread0 = *(volatile uint32_t *)sys_toyread0;
+    uint32_t TOYread1 = *(volatile uint32_t *)sys_toyread1;
+    // printf("TOYread0 value = 0x%08x\n", TOYread0);
+    // printf("TOYread1 value = 0x%08x\n", TOYread1);
+    tm->tm_msec = EXTRACT_BITS(TOYread0, 0, 3) * 100;
+    tm->tm_sec = EXTRACT_BITS(TOYread0, 4, 9);
+    tm->tm_min = EXTRACT_BITS(TOYread0, 10, 15);
+    tm->tm_hour = EXTRACT_BITS(TOYread0, 16, 20);
+    tm->tm_mday = EXTRACT_BITS(TOYread0, 21, 25);
+    tm->tm_mon = EXTRACT_BITS(TOYread0, 26, 31) - 1;
+    // 直接读取完整年份
+    tm->tm_year = TOYread1;
+    tm->tm_wday = CALCULATE_WEEKDAY(tm);
+    return 0;
+}
+```
+
+再实现`rtc_tm_to_sec`函数如下
+
+```c
+/* 将RTC时间结构体转换为从1970年1月1日开始的秒数 */
+uint64_t rtc_tm_to_sec(struct rtc_time *tm) {
+    if (tm == NULL) {
+        return -1;
+    }
+    // 每月的天数（非闰年）
+    static const int days_in_month[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    uint64_t days = 0;
+    // 计算从 1970 年到当前年份的天数
+    for (int year = 1970; year < tm->tm_year + 1900; year++) {
+        days += 365;
+        if ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)) {
+            days += 1; // 闰年多一天
+        }
+    }
+    // 计算当前年份中从 1 月到当前月份的天数
+    for (int month = 0; month < tm->tm_mon; month++) {
+        days += days_in_month[month];
+        if (month == 1 && (((tm->tm_year + 1900) % 4 == 0 && (tm->tm_year + 1900) % 100 != 0) || ((tm->tm_year + 1900) % 400 == 0))) {
+            days += 1; // 当前年份是闰年且当前月份是 2 月
+        }
+    }
+    // 加上当前月份中的天数
+    days += tm->tm_mday - 1;
+    // 转换为秒数
+    uint64_t seconds = days * 86400; // 每天 86400 秒
+    seconds += tm->tm_hour * 3600;   // 每小时 3600 秒
+    seconds += tm->tm_min * 60;      // 每分钟 60 秒
+    seconds += tm->tm_sec;           // 秒
+    return seconds;
+}
+```
+
+`rtc_read_time`函数从rtc寄存器中读取时间并存储到`tm`结构体中，`rtc_tm_to_sec`函数从`tm`结构体中读取数据，转化为秒数返回给`sys_clock_gettime`函数，`sys_clock_gettime`依次对`timespec`结构体进行设置：
+
+```c
+uint64_t sys_clock_gettime(void) {
+    uint64_t clock_id = argraw(0); //获取参数1
+    uint64_t ts_addr = argraw(1); //获取参数2
+    if (ts_addr == 0) {
+        return -1; // timespec 指针无效
+    }
+    struct timespec *ts = (struct timespec *)ts_addr;
+
+    switch (clock_id) {
+        case CLOCK_REALTIME:
+        case CLOCK_MONOTONIC:
+        case CLOCK_PROCESS_CPUTIME_ID:
+        case CLOCK_THREAD_CPUTIME_ID:
+        case CLOCK_MONOTONIC_RAW:
+        case CLOCK_REALTIME_COARSE:  //经过调试发现传入的clock_id为5，即CLOCK_REALTIME_COARSE
+            //printf("jump here");
+            //set rtc_time structure
+            struct rtc_time *tm = (struct rtc_time *)malloc(sizeof(struct rtc_time));
+            if (tm == NULL) {
+                panic("rtc_init: malloc failed");
+            } else {
+                memset(tm, 0, sizeof(struct rtc_time));
+            }
+            rtc_read_time(tm);
+            rtc_tm_to_sec(tm);
+            uint64_t seconds = rtc_tm_to_sec(tm);
+            ts->tv_sec = seconds;
+            break;
+        case CLOCK_MONOTONIC_COARSE:
+        case CLOCK_BOOTTIME:
+        default:
+            return -1;
+    }
+    return 0;
+}
+```
+
+后续运行测试脚本即可通过
+
+##### 写在一切之后
+
+为什么不在kmain里对rtc进行初始化也可以成功运行呢？

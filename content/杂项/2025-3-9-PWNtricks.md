@@ -168,7 +168,7 @@ struct sigcontext
 2. 存在相应的gadget
 3. 可以控制相当大的空间（存储fake frame）
 
-### 从wsl调用ida脚本
+## 从wsl调用ida脚本
 
 32位：
 
@@ -242,7 +242,7 @@ fi
 powershell.exe -Command "Start-Process -FilePath '$IDA_PATH' -ArgumentList '$REAL_PATH'"
 ```
 
-### tmux配置：
+## tmux配置：
 
 ```shell
 
