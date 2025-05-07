@@ -1,5 +1,5 @@
 ---
-draft: true
+draft: false
 ---
 
 ### 操作系统的概念、功能

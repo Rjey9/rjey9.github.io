@@ -1,5 +1,5 @@
 ---
-draft: true
+draft: false
 ---
 
 主要是些当时没做出来或者忙着陪对象打泰拉瑞亚没空看的题
@@ -217,5 +217,4 @@ if __name__ == '__main__':
     attack(io)
 ```
 
-### onlygets
 

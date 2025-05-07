@@ -1,5 +1,5 @@
 ---
-draft: true
+draft: false
 ---
 
 ### 打开kernel调试选项
