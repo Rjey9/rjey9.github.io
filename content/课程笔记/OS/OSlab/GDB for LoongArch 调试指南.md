@@ -106,19 +106,115 @@ target remote localhost:3456
 
 ### 用惯pwndbg的我无法忍受原生GDB
 
-所以我选择使用dashboard插件
+旧版pwndbg不支持loongarch 然而新版pwndbg已经支持
 
 进入你的用户目录`~`
 
 ```shell
-git clone https://github.com/cyrus-and/gdb-dashboard.git
-
-touch ~/.gdbinit
-
-echo 'source ~/gdb-dashboard/.gdbinit' > ~/.gdbinit
-
+git clone https://github.com/pwndbg/pwndbg.git
+cd pwndbg
+./setup.sh
 ```
 
-然后重新启动GDB for loongarch，连接上kernel进行调试，会发现布局以及操作正常人了很多：
+另外，发现pwngdb中关于loongarch64的寄存器约定不符合实际，可以对其做出修改：
 
-![](课程笔记/OS/OSlab/images/Loongarchgdb/dashboard.png)
+在pwndbg/lib/regs.py中找到如下代码：
+
+```python
+loongarch64 = RegisterSet(
+    pc=Reg("pc"),
+    stack=Reg("sp"),
+    frame=Reg("fp"),
+    retaddr=(Reg("ra"),),
+    gpr=(
+        Reg("a0"),
+        Reg("a1"),
+        Reg("a2"),
+        Reg("a3"),
+        Reg("a4"),
+        Reg("a5"),
+        Reg("a6"),
+        Reg("a7"),
+        Reg("t0"),
+        Reg("t1"),
+        Reg("t2"),
+        Reg("t3"),
+        Reg("t4"),
+        Reg("t5"),
+        Reg("t6"),
+        Reg("t7"),
+        Reg("t8"),
+        Reg("s0"),
+        Reg("s1"),
+        Reg("s2"),
+        Reg("s3"),
+        Reg("s4"),
+        Reg("s5"),
+        Reg("s6"),
+        Reg("s7"),
+        Reg("s8"),
+    ),
+    args=(
+        "a0",
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6",
+        "a7",
+    ),
+    # r21 stores "percpu base address", referred to as "u0" in the kernel
+    misc=("tp", "r21"),
+)
+```
+
+将其替换为：
+
+```python
+loongarch64 = RegisterSet(
+    pc=Reg("pc"),
+    stack=Reg("sp"),
+    frame=Reg("fp"),
+    retaddr=(Reg("ra"),),
+    gpr=(
+        Reg("r0"),  # $zero
+        Reg("r1"),  # $ra
+        Reg("r2"),  # $tp
+        Reg("r3"),  # $sp
+        Reg("r4"),  # $a0
+        Reg("r5"),  # $a1
+        Reg("r6"),  # $a2
+        Reg("r7"),  # $a3
+        Reg("r8"),  # $a4
+        Reg("r9"),  # $a5
+        Reg("r10"), # $a6
+        Reg("r11"), # $a7
+        Reg("r12"), # $t0
+        Reg("r13"), # $t1
+        Reg("r14"), # $t2
+        Reg("r15"), # $t3
+        Reg("r16"), # $t4
+        Reg("r17"), # $t5
+        Reg("r18"), # $t6
+        Reg("r19"), # $t7
+        Reg("r20"), # $t8
+        Reg("r21"), # $u0
+        Reg("r22"), # $fp
+        Reg("r23"), # $s0
+        Reg("r24"), # $s1
+        Reg("r25"), # $s2
+        Reg("r26"), # $s3
+        Reg("r27"), # $s4
+        Reg("r28"), # $s5
+        Reg("r29"), # $s6
+        Reg("r30"), # $s7
+        Reg("r31"), # $s8
+    ),
+    args=(
+        "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7",
+    ),
+    # r21 stores "percpu base address", referred to as "u0" in the kernel
+    misc=("tp", "u0"),
+)
+```
