@@ -7,7 +7,7 @@ categories:
 tags:
   - pwn
 description: faster faster faster!
-draft: true
+draft: false
 ---
 
 ## fastbin double free
