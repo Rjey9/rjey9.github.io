@@ -13,6 +13,7 @@ draft: false
 只记录在其他部分未曾记录的house of 手法
 
 ## house of einherjar
+
 非常类似于unsafe unlink，只是这次构造的fake chunk不在低地址chunk的user data内部，而是在任意位置（栈/bss等位置）
 
 以及我们利用的点不在于unlink操作本身，我们要绕过unlink的保护机制；真正的利用点在于unlink之后的后向合并操作。
